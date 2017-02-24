@@ -1,0 +1,7 @@
+FRAMEWORK: NET45
+NUGET
+  remote: https://www.nuget.org/api/v2
+    ExtCore (0.8.46)
+    FSharp.Core (4.1)
+      System.ValueTuple (>= 4.3)
+    System.ValueTuple (4.3)
