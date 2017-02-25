@@ -10,61 +10,50 @@ module AST =
     type FieldId = FieldId of string
     
     // type abbrevation, type definition in Decl module
-    module Typ =
-        type Typ =
-        | Type of TypeId
-        | Generic of GenericId
-        | WithGeneric of GenericId * Typ
-        | Fun of Typ * Typ
-        | Tuple of Typ []
-
-    type Typ = Typ.Typ
+    type Typ =
+    | TypType of TypeId
+    | TypGeneric of GenericId
+    | TypWithGeneric of GenericId * Typ
+    | TypFun of Typ * Typ
+    | TypTuple of Typ list
 
     // Pattern
-    module Pat =
-        type Pat =
-        | Const of ConstId
-        | Wildcard
-        | Bind of ValId //binding to identificator
-        | Cons of ValId * Pat
-        | InfixCons of Pat * ValId * Pat
-        | Tuple of Pat []
-        | Record of (FieldId * Pat) []
-        | WithType of Typ * Pat
-        | BindAs of ValId * Pat
-
-    type Pat = Pat.Pat
+    type Pat =
+    | PatConst of ConstId
+    | PatWildcard
+    | PatBind of ValId //binding to identificator
+    | PatCons of ValId * Pat
+    | PatInfixCons of Pat * ValId * Pat
+    | PatTuple of Pat list
+    | PatRecord of (FieldId * Pat) list
+    | PatWithType of Typ * Pat
+    | PatBindAs of ValId * Pat
     
-    module TypeDecl =
-        type TypeDecl = 
-        | Record of (FieldId * TypeDecl) []
-        | Union of (ValId * TypeDecl option) []
-        | Tuple of TypeDecl []
-        | Primitive of PrimitiveId
-        | WithGeneric of GenericId * TypeDecl
-    type TypeDecl = TypeDecl.TypeDecl
+    type TypeDecl = 
+    | TypeDeclRecord of (FieldId * TypeDecl) list
+    | TypeDeclUnion of (ValId * TypeDecl option) list
+    | TypeDeclTuple of TypeDecl list
+    | TypeDeclPrimitive of PrimitiveId
+    | TypeDeclWithGeneric of GenericId * TypeDecl
     
-    module Expr =
-        type Expr =
-        | Const of ConstId
-        | Val of ValId
-        | App of Expr * Expr //application
-        | InfixApp of Expr * ValId * Expr
-        | Tuple of Expr []
-        | Record of (FieldId * Expr) []
-        | Sequence of Expr [] // command1; commmand2; Expr
-        | RecSequence of Expr [] // command1; commmand2; Expr
-        | Bind of (Pat []) * Expr // let x = expr //TODO let rec
-        | Match of Pat * Match []
-        | Fun of Match
-        | WithType of Typ * Expr
-        | Module of ModuleId * Expr
-        | Type of TypeId * TypeDecl
-        | NewType of TypeId * TypeDecl
-        | Include of ModuleId
+    type Expr =
+    | ExprConst of ConstId
+    | ExprVal of ValId
+    | ExprApp of Expr * Expr //application
+    | ExprInfixApp of Expr * ValId * Expr
+    | ExprTuple of Expr list
+    | ExprRecord of (FieldId * Expr) list
+    | ExprSequence of Expr list // command1; commmand2; Expr
+    | ExprRecSequence of Expr list // command1; commmand2; Expr
+    | ExprBind of (Pat list) * Expr // let x = expr //TODO let rec
+    | ExprMatch of Expr * Match list
+    | ExprFun of Match
+    | ExprWithType of Typ * Expr
+    | ExprModule of ModuleId * Expr
+    | ExprType of TypeId * TypeDecl
+    | ExprNewType of TypeId * TypeDecl
+    | ExprInclude of ModuleId
 
-        and Match = Pat * Expr
-
-    type Expr = Expr.Expr
+    and Match = Pat * Expr
 
     type Program = Program of Expr
