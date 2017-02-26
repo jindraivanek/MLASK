@@ -1,6 +1,14 @@
 #load "Include.fsx"
 open MLASK.AST
 
+let (@@) x y = System.IO.Path.Combine(x, y) 
+let samplesDir = "samples"
+let outputDir = "output"
+let samples = [
+    "sample1"
+    "fib"
+]
+
 let rec rewriteAst =
     function
     | ExprVal(ValId("printfn")) -> ExprVal(ValId("Printf.printf"))
@@ -11,9 +19,15 @@ let rewrite str =
     |> String.replace "printf" "Printf.printf"
     |> String.replace "op_Addition" "(+)"
     |> String.replace "op_Equality" "(=)"
+    |> String.replace "op_LessThan" "(<)"
+    |> String.replace "op_Subtraction" "(-)"
 
-let ast = "samples/sample1.fsx" |> FSharpInput.toAST 
-ast |> printfn "%A"
-let out = ast |> OcamlOutput.getExpr |> rewrite 
-out |> printfn "%s"
-System.IO.File.WriteAllText("output/sample1.ml", out)
+samples |> Seq.iter (fun x ->
+    let fsFile = samplesDir @@ x + ".fsx" 
+    let outputPath = outputDir @@ x
+    System.IO.File.WriteAllText(outputPath+".fsast", sprintf "%A" (FSharpInput.getFsAst fsFile))
+    let ast = fsFile |> FSharpInput.toAST
+    System.IO.File.WriteAllText(outputPath+".mlast", sprintf "%A" ast)
+    let out = ast |> OcamlOutput.getExpr |> rewrite 
+    out |> printfn "%s"
+    System.IO.File.WriteAllText(outputPath+".ml", out))

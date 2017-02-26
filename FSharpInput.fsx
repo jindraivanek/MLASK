@@ -23,6 +23,10 @@ let getUntypedTree (file, input) =
   | Some tree -> tree
   | None -> failwith "Something went wrong during parsing!"
 
+let getFsAst file =
+    let input = System.IO.File.ReadAllText file
+    getUntypedTree(file, input)
+
 let toAST(file) =
 
     let constE x = ExprConst (ConstId x)
@@ -31,8 +35,7 @@ let toAST(file) =
         | [x] -> x
         | [] -> f []
 
-    let input = System.IO.File.ReadAllText file
-    let tree = getUntypedTree(file, input)
+    let tree = getFsAst file
 
     let visitLongIdent (ident: LongIdent) =
         let names = String.concat "." [ for i in ident -> i.idText ]
@@ -59,29 +62,35 @@ let toAST(file) =
     | SynPat.Const(c,_) -> PatConst (visitConst c)
     | pat -> failwithf "[pattern: %A]" pat
 
-    let rec getBind bindings =
+    let rec getBind isRec bindings =
         bindings |> Seq.map (fun binding ->
             let (Binding(access, kind, inlin, mutabl, attrs, xmlDoc, 
                         data, pat, retInfo, init, m, sp)) = binding
-            ExprBind ([visitPattern pat], visitExpression init))
-        |> Seq.toList |> multi ExprRecSequence
+            (visitPattern pat, visitExpression init))
+        |> Seq.toList 
+        |> (fun x -> if isRec then ExprRecBind x else let (p,e) = Seq.head x in ExprBind (p, e)) 
     
     and visitExpression = function
     | SynExpr.IfThenElse(cond, trueBranch, falseBranchOpt, _, _, _, _) ->
-        let trueMatch = PatConst (ConstId "true"), visitExpression trueBranch
-        let elseMatch = PatConst (ConstId "false"), defaultArg (falseBranchOpt |> Option.map visitExpression) (constE "()") 
+        let trueMatch = PatConst (ConstId "true"), None, visitExpression trueBranch
+        let elseMatch = PatConst (ConstId "false"), None, defaultArg (falseBranchOpt |> Option.map visitExpression) (constE "()") 
         ExprMatch ((visitExpression cond), [trueMatch; elseMatch])
 
-    | SynExpr.LetOrUse(_, _, bindings, body, _) ->
+    | SynExpr.MatchLambda(_,_, matches,_,_) -> 
+        matches |> List.map (function
+            | Clause (pat, whenExpr, e, _, _) -> visitPattern pat, (whenExpr |> Option.map visitExpression), visitExpression e  
+        ) |> ExprMatchLambda 
+
+    | SynExpr.LetOrUse(isRec, _, bindings, body, _) ->
         // Visit bindings (there may be multiple 
         // for 'let .. = .. and .. = .. in ...'
         //printfn "LetOrUse with the following bindings:"
-        getBind bindings
-        |> fun x -> ExprSequence [x; (visitExpression body)]
+        ExprSequence [getBind isRec bindings; visitExpression body]
     
     | SynExpr.Const(c,_) -> visitConst c |> ExprConst
     | SynExpr.App(_,_,x,y,_) -> ExprApp(visitExpression x, visitExpression y)
     | SynExpr.Ident(ident) -> ExprVal (ValId ident.idText)
+    | SynExpr.Paren(expr,_,_,_) -> visitExpression expr
 
     | SynExpr.Sequential(_, _, e1, e2, _) -> ExprSequence [visitExpression e1; visitExpression e2]
 
@@ -91,7 +100,7 @@ let toAST(file) =
         decls |> Seq.map (fun declaration ->
             match declaration with
             | SynModuleDecl.Let(isRec, bindings, range) ->
-                getBind bindings
+                getBind isRec bindings
             | SynModuleDecl.DoExpr(_, e, _) -> visitExpression e
             | _ -> failwithf " - not supported declaration: %A" declaration)
         |> Seq.toList

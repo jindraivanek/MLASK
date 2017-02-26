@@ -43,7 +43,18 @@ let rec getDecl =
     | TypeDeclPrimitive (PrimitiveId p) -> p
     | TypeDeclWithGeneric (GenericId g, t) -> [g; getDecl t] |> delim " "
 
-let rec getExpr =
+let rec getMatch (p, whenE, e) =
+    let whenClause = whenE |> Option.map (fun x -> " when " + getExpr x) |> Option.fill ""
+    [getPat p + whenClause; getExpr e] |> delim " -> "
+
+and getBind isRec isFirstRec (p, e) =
+    match isRec, isFirstRec with
+    | true, true -> "let rec "
+    | true, false -> "and "
+    | _ -> "let " 
+    + getPat p + " = " + nl + getExpr e
+
+and getExpr =
     function
     | ExprConst (ConstId c) -> c
     | ExprVal (ValId v) -> v
@@ -51,10 +62,17 @@ let rec getExpr =
     | ExprInfixApp (e1, ValId v, e2) -> [getExpr e1; v; getExpr e2] |> delim " " |> surround "(" ")"
     | ExprTuple ts -> ts |> List.map getExpr |> delimSurround ", " "(" ")"
     | ExprRecord rows -> rows |> Seq.map (fun (FieldId f, e) -> f + " = " + getExpr e) |> delim "; " |> surround "{" "}"
-    | ExprBind (ps, e) -> "let " + (ps |> Seq.map getPat |> delim " ") + " = " + nl + getExpr e
+    | ExprBind (p,e) -> 
+        getBind false false (p,e)
+    | ExprRecBind bindings -> 
+        let n = Seq.length bindings
+        (bindings |> Seq.mapi (fun i x -> getBind true (i=0) x) |> delim nl) 
     | ExprMatch (e, rows) -> 
         (["match"; getExpr e; "with"] |> delim " ")
-        + nl + (rows |> Seq.map (fun (p, e) -> [getPat p; getExpr e] |> delim " -> ") |> delim (nl + "| "))
+        + nl + (rows |> Seq.map (fun m -> getMatch m) |> delim (nl + "| "))
+    | ExprMatchLambda (rows) -> 
+        "function"
+        + nl + (rows |> Seq.map (fun m -> getMatch m) |> delim (nl + "| "))
     | ExprFun (p, e) -> "fun " + getPat p + " -> " + getExpr e |> surround "(" ")"
     | ExprWithType (t, e) -> getExpr e + " : " + getTyp t
     | ExprModule (ModuleId m, e) -> "module " + m + " = struct " + nl + getExpr e + " end"
@@ -63,6 +81,6 @@ let rec getExpr =
     | ExprInclude (ModuleId m) -> "load " + m
     | ExprSequence es -> 
         let n = Seq.length es
-        es |> Seq.mapi (fun i e -> getExpr e + (if i < n-1 then match e with |ExprBind _ -> " in " |_ -> "; " else ""))
+        es |> Seq.mapi (fun i e -> getExpr e + (if i < n-1 then match e with |ExprBind _ |ExprRecBind _ -> " in " |_ -> "; " else ""))
         |> delim nl //|> surround "(" ")"
-    | ExprRecSequence es -> failwith "not supported"
+    

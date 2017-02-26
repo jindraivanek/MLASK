@@ -44,16 +44,17 @@ module AST =
     | ExprTuple of Expr list
     | ExprRecord of (FieldId * Expr) list
     | ExprSequence of Expr list // command1; commmand2; Expr
-    | ExprRecSequence of Expr list // command1; commmand2; Expr
-    | ExprBind of (Pat list) * Expr // let x = expr //TODO let rec
+    | ExprBind of Pat * Expr // let x = expr1
+    | ExprRecBind of (Pat * Expr) list
     | ExprMatch of Expr * Match list
-    | ExprFun of Match
+    | ExprMatchLambda of Match list
+    | ExprFun of Pat * Expr
     | ExprWithType of Typ * Expr
     | ExprModule of ModuleId * Expr
     | ExprType of TypeId * TypeDecl
     | ExprNewType of TypeId * TypeDecl
     | ExprInclude of ModuleId
 
-    and Match = Pat * Expr
+    and Match = Pat * Expr option * Expr
 
     type Program = Program of Expr
