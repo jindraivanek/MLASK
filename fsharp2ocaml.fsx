@@ -7,6 +7,7 @@ let outputDir = "output"
 let samples = [
     "sample1"
     "fib"
+    "curry"
 ]
 
 let rec rewriteAst =

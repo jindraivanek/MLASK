@@ -28,7 +28,7 @@ let rec getPat =
     | PatConst (ConstId c) -> c
     | PatWildcard -> "_"
     | PatBind (ValId v) -> v
-    | PatCons (ValId v, p) -> v + " " + getPat p
+    | PatCons (ValId v, ps) -> v + " " + (ps |> Seq.map getPat |> delim " ")
     | PatInfixCons (p1, (ValId v), p2) -> [getPat p1; v; getPat p2] |> delim " " |> surround "(" ")"
     | PatTuple ts -> ts |> List.map getPat |> delimSurround ", " "(" ")" 
     | PatRecord rows -> rows |> Seq.map (fun (FieldId f, p) -> f + " = " + getPat p) |> delim "; " |> surround "{" "}" 

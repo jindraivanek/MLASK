@@ -22,7 +22,7 @@ module AST =
     | PatConst of ConstId
     | PatWildcard
     | PatBind of ValId //binding to identificator
-    | PatCons of ValId * Pat
+    | PatCons of ValId * Pat list
     | PatInfixCons of Pat * ValId * Pat
     | PatTuple of Pat list
     | PatRecord of (FieldId * Pat) list

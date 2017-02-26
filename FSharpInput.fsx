@@ -49,7 +49,7 @@ let toAST(file) =
         | x -> failwithf "[Const: %A]" x
 
     let rec visitConstrArgs = function
-        | SynConstructorArgs.Pats pats -> pats |> List.map visitPattern |> PatTuple
+        | SynConstructorArgs.Pats pats -> pats |> List.map visitPattern
         | x -> failwithf "[ConstrArgs: %A]" x
 
     and visitPattern = function
