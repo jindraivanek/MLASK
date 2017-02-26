@@ -6,6 +6,8 @@ open Microsoft.FSharp.Compiler.Ast
 
 open MLASK.AST
 
+let rec flatten f x = f x |> Seq.collect (fun x -> flatten f x)
+
 let checker = FSharpChecker.Create()
 
 let getUntypedTree (file, input) = 
@@ -52,6 +54,10 @@ let toAST(file) =
         | SynConstructorArgs.Pats pats -> pats |> List.map visitPattern
         | x -> failwithf "[ConstrArgs: %A]" x
 
+    and getSimplePats = function
+        | SynSimplePats.SimplePats (pats, _) -> pats |> List.map (function
+            | SynSimplePat.Id(ident,_,_,_,_,_) -> PatBind(ValId ident.idText))
+
     and visitPattern = function
     | SynPat.Wild(_) -> PatWildcard
     | SynPat.Named(SynPat.Wild(_), name, _, _, _) -> PatBind(ValId name.idText)
@@ -60,6 +66,8 @@ let toAST(file) =
         PatCons(ValId (visitLongIdent ident), visitConstrArgs pats)
     | SynPat.Paren(expr,_) -> visitPattern expr
     | SynPat.Const(c,_) -> PatConst (visitConst c)
+    | SynPat.Tuple(xs,_) -> PatTuple (List.map visitPattern xs)
+    | SynPat.ArrayOrList(_,xs,_) -> PatList (List.map visitPattern xs)
     | pat -> failwithf "[pattern: %A]" pat
 
     let rec getBind isRec bindings =
@@ -68,7 +76,13 @@ let toAST(file) =
                         data, pat, retInfo, init, m, sp)) = binding
             (visitPattern pat, visitExpression init))
         |> Seq.toList 
-        |> (fun x -> if isRec then ExprRecBind x else let (p,e) = Seq.head x in ExprBind (p, e)) 
+        |> (fun x -> if isRec then ExprRecBind x else let (p,e) = Seq.head x in ExprBind (p, e))
+
+    and getMatches matches =
+        matches |> List.map (function
+            | Clause (pat, whenExpr, e, _, _) -> visitPattern pat, (whenExpr |> Option.map visitExpression), visitExpression e  
+        )
+
     
     and visitExpression = function
     | SynExpr.IfThenElse(cond, trueBranch, falseBranchOpt, _, _, _, _) ->
@@ -76,21 +90,32 @@ let toAST(file) =
         let elseMatch = PatConst (ConstId "false"), None, defaultArg (falseBranchOpt |> Option.map visitExpression) (constE "()") 
         ExprMatch ((visitExpression cond), [trueMatch; elseMatch])
 
+    | SynExpr.Match(_,expr, matches,_,_) -> 
+        ExprMatch (visitExpression expr, getMatches matches)
+    
     | SynExpr.MatchLambda(_,_, matches,_,_) -> 
-        matches |> List.map (function
-            | Clause (pat, whenExpr, e, _, _) -> visitPattern pat, (whenExpr |> Option.map visitExpression), visitExpression e  
-        ) |> ExprMatchLambda 
+        getMatches matches |> ExprMatchLambda 
 
     | SynExpr.LetOrUse(isRec, _, bindings, body, _) ->
         // Visit bindings (there may be multiple 
         // for 'let .. = .. and .. = .. in ...'
         //printfn "LetOrUse with the following bindings:"
         ExprSequence [getBind isRec bindings; visitExpression body]
+
+    | SynExpr.Lambda(_, _, args, body, _) -> ExprLambda (getSimplePats args, visitExpression body)
     
     | SynExpr.Const(c,_) -> visitConst c |> ExprConst
     | SynExpr.App(_,_,x,y,_) -> ExprApp(visitExpression x, visitExpression y)
     | SynExpr.Ident(ident) -> ExprVal (ValId ident.idText)
+    | SynExpr.LongIdent(_, LongIdentWithDots(ident, _), _, _) ->
+        ExprVal (ValId (visitLongIdent ident))
     | SynExpr.Paren(expr,_,_,_) -> visitExpression expr
+
+    | SynExpr.Tuple(exprs, _, _) -> exprs |> List.map visitExpression |> ExprTuple
+    | SynExpr.ArrayOrList(_, exprs,_) -> exprs |> List.map visitExpression |> ExprList
+    | SynExpr.ArrayOrListOfSeqExpr(_,SynExpr.CompExpr(true,_,seqs,_),_) -> 
+        seqs |> flatten (function |SynExpr.Sequential(_,_,e1,e2,_) -> [e1;e2] |_ -> [])
+        |> Seq.map visitExpression |> Seq.toList |> ExprList
 
     | SynExpr.Sequential(_, _, e1, e2, _) -> ExprSequence [visitExpression e1; visitExpression e2]
 
@@ -102,6 +127,7 @@ let toAST(file) =
             | SynModuleDecl.Let(isRec, bindings, range) ->
                 getBind isRec bindings
             | SynModuleDecl.DoExpr(_, e, _) -> visitExpression e
+            | SynModuleDecl.HashDirective _ -> constE "()"
             | _ -> failwithf " - not supported declaration: %A" declaration)
         |> Seq.toList
         |> ExprSequence

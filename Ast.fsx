@@ -25,6 +25,7 @@ module AST =
     | PatCons of ValId * Pat list
     | PatInfixCons of Pat * ValId * Pat
     | PatTuple of Pat list
+    | PatList of Pat list
     | PatRecord of (FieldId * Pat) list
     | PatWithType of Typ * Pat
     | PatBindAs of ValId * Pat
@@ -42,13 +43,14 @@ module AST =
     | ExprApp of Expr * Expr //application
     | ExprInfixApp of Expr * ValId * Expr
     | ExprTuple of Expr list
+    | ExprList of Expr list
     | ExprRecord of (FieldId * Expr) list
     | ExprSequence of Expr list // command1; commmand2; Expr
     | ExprBind of Pat * Expr // let x = expr1
     | ExprRecBind of (Pat * Expr) list
     | ExprMatch of Expr * Match list
     | ExprMatchLambda of Match list
-    | ExprFun of Pat * Expr
+    | ExprLambda of Pat list * Expr
     | ExprWithType of Typ * Expr
     | ExprModule of ModuleId * Expr
     | ExprType of TypeId * TypeDecl
