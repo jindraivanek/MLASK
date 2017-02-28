@@ -1,4 +1,4 @@
-type a = { x: int; y: float; z: A }
+type a = { x: int; y: float; z: a }
 
 let rec r = { x = 1; y = 2.0; z = r}
 
