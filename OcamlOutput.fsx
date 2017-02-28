@@ -41,7 +41,7 @@ let rec getDecl =
     | TypeDeclRecord rows -> rows |> Seq.map (fun (FieldId f, t) -> f + " : " + getDecl t) |> delim "; " |> surround "{" "}"
     | TypeDeclUnion rows -> rows |> Seq.map (fun (ValId v, t) -> v + (t |> Option.map (fun x -> " of " + getDecl x) |> Option.fill "")) |> delim " | "
     | TypeDeclTuple ts -> ts |> Seq.map getDecl |> delim " * " |> surround "(" ")"
-    | TypeDeclPrimitive (PrimitiveId p) -> p
+    | TypeDeclId (TypeId p) -> p
     | TypeDeclWithGeneric (GenericId g, t) -> [g; getDecl t] |> delim " "
 
 let rec getMatch (p, whenE, e) =
@@ -63,7 +63,10 @@ and getExpr =
     | ExprInfixApp (e1, ValId v, e2) -> [getExpr e1; v; getExpr e2] |> delim " " |> surround "(" ")"
     | ExprTuple ts -> ts |> List.map getExpr |> delimSurround ", " "(" ")"
     | ExprList ts -> ts |> List.map getExpr |> delimSurround "; " "[" "]"
-    | ExprRecord rows -> rows |> Seq.map (fun (FieldId f, e) -> f + " = " + getExpr e) |> delim "; " |> surround "{" "}"
+    | ExprRecord (copyE, rows) -> 
+        let fields = rows |> Seq.map (fun (FieldId f, e) -> f + " = " + getExpr e) |> delim "; " 
+        let copyStat = copyE |> Option.map (fun x -> getExpr x + " with ") |> Option.fill ""
+        copyStat + fields |> surround "{" "}"
     | ExprBind (p,e) -> 
         getBind false false (p,e)
     | ExprRecBind bindings -> 
@@ -83,6 +86,14 @@ and getExpr =
     | ExprInclude (ModuleId m) -> "load " + m
     | ExprSequence es -> 
         let n = Seq.length es
-        es |> Seq.mapi (fun i e -> getExpr e + (if i < n-1 then match e with |ExprBind _ |ExprRecBind _ -> " in " |_ -> "; " else ""))
+        es |> Seq.mapi (fun i e -> 
+            getExpr e + 
+            (if i < n-1 then 
+                match e with 
+                |ExprBind _ 
+                |ExprRecBind _ -> " in " 
+                |ExprType _ -> ";;"
+                |_ -> "; " 
+            else ""))
         |> delim nl //|> surround "(" ")"
     

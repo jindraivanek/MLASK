@@ -10,6 +10,7 @@ let samples = [
     "curry"
     "multirec"
     "problems99"
+    "types"
 ]
 
 let rec rewriteAst =

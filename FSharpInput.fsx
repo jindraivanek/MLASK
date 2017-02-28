@@ -47,6 +47,7 @@ let toAST(file) =
         | SynConst.String(lit,_) -> sprintf "\"%s\"" lit |> ConstId
         | SynConst.Bool(x) -> sprintf "%A" x |> ConstId
         | SynConst.Int32(x) -> sprintf "%i" x |> ConstId
+        | SynConst.Double(x) -> sprintf "%f" x |> ConstId
         | SynConst.Unit -> ConstId "()"
         | x -> failwithf "[Const: %A]" x
 
@@ -68,6 +69,9 @@ let toAST(file) =
     | SynPat.Const(c,_) -> PatConst (visitConst c)
     | SynPat.Tuple(xs,_) -> PatTuple (List.map visitPattern xs)
     | SynPat.ArrayOrList(_,xs,_) -> PatList (List.map visitPattern xs)
+    | SynPat.Record(fields ,_) -> 
+        fields |> List.map (fun ((_,name), pat) -> FieldId(name.idText), visitPattern pat)
+        |> PatRecord
     | pat -> failwithf "[pattern: %A]" pat
 
     let rec getBind isRec bindings =
@@ -116,11 +120,39 @@ let toAST(file) =
     | SynExpr.ArrayOrListOfSeqExpr(_,SynExpr.CompExpr(true,_,seqs,_),_) -> 
         seqs |> flatten (function |SynExpr.Sequential(_,_,e1,e2,_) -> [e1;e2] |_ -> [])
         |> Seq.map visitExpression |> Seq.toList |> ExprList
+    | SynExpr.Record(_,copyInfo,fields,_) -> 
+        let fs =
+            fields |> List.choose (fun ((LongIdentWithDots(longId,_),_),e,_) -> 
+                e |> Option.map (fun e -> FieldId(visitLongIdent longId), visitExpression e))
+        let copyExpr = copyInfo |> Option.map (fst >> visitExpression)
+        ExprRecord (copyExpr, fs) 
 
     | SynExpr.Sequential(_, _, e1, e2, _) -> ExprSequence [visitExpression e1; visitExpression e2]
 
     | expr -> failwithf " - not supported expression: %A" expr
 
+    let getIdOfComponentInfo =
+        function
+        | ComponentInfo(_, _, _, longId, _, _, _, _) -> visitLongIdent longId |> TypeId
+    
+    let visitTypeDef =
+        function
+        | TypeDefn(compInfo, defnRepr, members, _) ->
+            match defnRepr with
+            | SynTypeDefnRepr.Simple(simpleRepr,_) ->
+                match simpleRepr with
+                | SynTypeDefnSimpleRepr.Record(_,fields,_) ->
+                    let fs =
+                        fields |> List.map (
+                            function 
+                            Field(_,_,id,typ,_,_,_,_) -> 
+                                let fieldId = FieldId((id |> Option.get).idText) 
+                                match typ with
+                                | SynType.LongIdent(LongIdentWithDots(ids,_)) -> 
+                                    fieldId, TypeDeclId(TypeId (visitLongIdent ids)))
+                    Expr.ExprType(getIdOfComponentInfo compInfo, TypeDeclRecord fs) 
+                        
+    
     let visitDeclarations decls = 
         decls |> Seq.map (fun declaration ->
             match declaration with
@@ -128,6 +160,8 @@ let toAST(file) =
                 getBind isRec bindings
             | SynModuleDecl.DoExpr(_, e, _) -> visitExpression e
             | SynModuleDecl.HashDirective _ -> constE "()"
+            | SynModuleDecl.Types(typeDefs, _) -> 
+                typeDefs |> List.map visitTypeDef |> multi ExprSequence 
             | _ -> failwithf " - not supported declaration: %A" declaration)
         |> Seq.toList
         |> ExprSequence

@@ -4,7 +4,6 @@ module AST =
     type ModuleId = ModuleId of string
     type TypeId = TypeId of string
     type GenericId = GenericId of string
-    type PrimitiveId = PrimitiveId of string
     type ConstId = ConstId of string
     type ValId = ValId of string
     type FieldId = FieldId of string
@@ -34,7 +33,7 @@ module AST =
     | TypeDeclRecord of (FieldId * TypeDecl) list
     | TypeDeclUnion of (ValId * TypeDecl option) list
     | TypeDeclTuple of TypeDecl list
-    | TypeDeclPrimitive of PrimitiveId
+    | TypeDeclId of TypeId
     | TypeDeclWithGeneric of GenericId * TypeDecl
     
     type Expr =
@@ -44,7 +43,7 @@ module AST =
     | ExprInfixApp of Expr * ValId * Expr
     | ExprTuple of Expr list
     | ExprList of Expr list
-    | ExprRecord of (FieldId * Expr) list
+    | ExprRecord of Expr option * (FieldId * Expr) list // recordToCopy, fields
     | ExprSequence of Expr list // command1; commmand2; Expr
     | ExprBind of Pat * Expr // let x = expr1
     | ExprRecBind of (Pat * Expr) list
