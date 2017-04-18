@@ -1,4 +1,4 @@
-#load "Include.fsx"
+#load "IncludeMLASK.fsx"
 
 open System
 open Microsoft.FSharp.Compiler.SourceCodeServices
@@ -109,7 +109,9 @@ let toAST(file) =
     | SynExpr.Lambda(_, _, args, body, _) -> ExprLambda (getSimplePats args, visitExpression body)
     
     | SynExpr.Const(c,_) -> visitConst c |> ExprConst
-    | SynExpr.App(_,_,x,y,_) -> ExprApp(visitExpression x, visitExpression y)
+    | SynExpr.App(_,false, SynExpr.App(_,true, SynExpr.Ident ident,x,_),y,_) -> 
+        ExprInfixApp(visitExpression x, ValId ident.idText, visitExpression y)
+    | SynExpr.App(_,false,x,y,_) -> ExprApp(visitExpression x, visitExpression y)
     | SynExpr.Ident(ident) -> ExprVal (ValId ident.idText)
     | SynExpr.LongIdent(_, LongIdentWithDots(ident, _), _, _) ->
         ExprVal (ValId (visitLongIdent ident))

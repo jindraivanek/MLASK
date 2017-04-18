@@ -1,4 +1,4 @@
-#load "Include.fsx"
+#load "IncludeMLASK.fsx"
 open MLASK.AST
 
 let (@@) x y = System.IO.Path.Combine(x, y) 
@@ -9,19 +9,15 @@ let samples = [
     "fib"
     "curry"
     "multirec"
-    "problems99"
     "types"
+    "record_bench"
 ]
 
-let rec rewriteAst =
-    function
-    | ExprVal(ValId("printfn")) -> ExprVal(ValId("Printf.printf"))
-    | x -> x
-
-let rewrite str = 
+let rewriteOcaml str = 
     str
     |> String.replace "op_Addition" "(+)"
     |> String.replace "op_Equality" "(=)"
+    |> String.replace "op_Inequality" "(<>)"
     |> String.replace "op_LessThan" "(<)"
     |> String.replace "op_Subtraction" "(-)"
     |> String.replace "op_ColonColon" "(::)"
@@ -30,19 +26,41 @@ let rewrite str =
     |> String.replace "printf" "Printf.printf"
     |> String.replace "List.head" "List.hd"
     |> String.replace "List.tail" "List.tl"
+
+let rewriteHaxe str = 
+    str
+    |> String.replace "op_Addition" "+"
+    |> String.replace "op_Equality" "=="
+    |> String.replace "op_Inequality" "!="
+    |> String.replace "op_LessThan" "<"
+    |> String.replace "op_Subtraction" "-"
+    |> String.replace "op_ColonColon" "::"
+    |> String.replace "op_PipeRight" "|>"
+
+    |> String.replace "printfn(\"%A\")" "Sys.println"
+    |> String.replace "printfn(\"%i\")" "Sys.println"
+    |> String.replace "printfn(\"%s\")" "Sys.println"
+    |> String.replace "printfn" "Sys.println"
+    |> String.replace "printf(\"%A\")" "Sys.print"
+    |> String.replace "printf(\"%i\")" "Sys.print"
+    |> String.replace "printf(\"%s\")" "Sys.print"
+    |> String.replace "printf" "Sys.print"
+    |> String.replace "List.head" "List.hd"
+    |> String.replace "List.tail" "List.tl"
     
 
-let compile () =
-    samples |> Seq.iter (fun x ->
+let compile exprF rewrite ext =
+    samples |> Seq.take 2 |> Seq.iter (fun x ->
         let fsFile = samplesDir @@ x + ".fsx" 
         let outputPath = outputDir @@ x
         System.IO.File.WriteAllText(outputPath+".fsast", sprintf "%A" (FSharpInput.getFsAst fsFile))
         let ast = fsFile |> FSharpInput.toAST
         System.IO.File.WriteAllText(outputPath+".mlast", sprintf "%A" ast)
-        let out = ast |> OcamlOutput.getExpr |> rewrite 
+        let out = ast |> exprF |> rewrite 
         out |> printfn "%s"
-        System.IO.File.WriteAllText(outputPath+".ml", out))
+        System.IO.File.WriteAllText(outputPath+"."+ext, out))
 
 try
-    compile()
+    //compile OcamlOutput.getExpr rewriteOcaml "ml"
+    compile HaxeOutput.getExprAndFormat rewriteHaxe "hx"
 with e -> printfn "%s" e.Message
