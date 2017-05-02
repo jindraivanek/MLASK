@@ -49,18 +49,30 @@ let rewriteHaxe str =
     |> String.replace "List.tail" "List.tl"
     
 
-let compile exprF rewrite ext =
-    samples |> Seq.take 2 |> Seq.iter (fun x ->
+let firstCharUpperCase s = s |> String.mapi (fun i c -> if i = 0 then System.Char.ToUpper c else c)
+
+let compile transformF exprF rewrite ext =
+    samples |> Seq.iter (fun x ->
         let fsFile = samplesDir @@ x + ".fsx" 
+        let x = firstCharUpperCase x
         let outputPath = outputDir @@ x
         System.IO.File.WriteAllText(outputPath+".fsast", sprintf "%A" (FSharpInput.getFsAst fsFile))
         let ast = fsFile |> FSharpInput.toAST
         System.IO.File.WriteAllText(outputPath+".mlast", sprintf "%A" ast)
-        let out = ast |> exprF |> rewrite 
+        let ast2 = ast |> transformF
+        System.IO.File.WriteAllText(outputPath+".mlastt", sprintf "%A" ast2)
+        let out = ast2 |> exprF |> rewrite 
         out |> printfn "%s"
         System.IO.File.WriteAllText(outputPath+"."+ext, out))
 
+#if INTERACTIVE
+#else
+let run() =
+#endif
 try
     //compile OcamlOutput.getExpr rewriteOcaml "ml"
-    compile HaxeOutput.getExprAndFormat rewriteHaxe "hx"
-with e -> printfn "%s" e.Message
+    let transforms = 
+        MLASK.AstTransform.expandMatchLambda
+        >> MLASK.AstTransform.topLevelExprToMainFunction
+    compile transforms HaxeOutput.getExprAndFormat rewriteHaxe "hx"
+with e -> printfn "%s::%s" e.Message e.StackTrace

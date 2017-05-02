@@ -2,10 +2,6 @@
 
 open MLASK.AST
 
-let mutable tmpValId = 0
-let getTmpValId() = 
-    tmpValId <- tmpValId + 1
-    sprintf "__tmp_%i" tmpValId
 let nl = System.Environment.NewLine
 
 let surround head tail body = head + body + tail
@@ -33,7 +29,6 @@ let rec exprIsReturnable =
     | ExprVal _ -> true
     | ExprWithType (_,e) -> exprIsReturnable e
     | _ -> false
-    
 
 let rec getTyp =
     function
@@ -74,18 +69,14 @@ let toSequence =
 
 let rec getMatch (p, whenE, e) =
     let whenClause = whenE |> Option.map (fun x -> " if(" + getExpr x + ") ") |> Option.fill ""
-    [getPat p + whenClause; getExpr e] |> delim " : "
+    [getPat p + whenClause; getExpr (toSequence e)] |> delim " : "
 
 and getBind isRec isFirstRec (p, e) =
     match p,e with
     | PatCons _, _ ->
         "static public function " + getPat p + getExpr (toSequence e)
     | _, ExprLambda (args, e) -> 
-        "static public function " + (args |> Seq.map getPat |> delimSurround ", " "(" ")") + getExpr (toSequence e)
-    | _, ExprMatchLambda rows -> 
-        let t = getTmpValId()
-        "static public function " + getPat p + "(" + t + ")"
-        + (ExprMatch ((ExprVal (ValId t)), rows) |> toSequence |> getExpr)
+        "static public function " + getPat p + (args |> Seq.map getPat |> delimSurround ", " "(" ")") + getExpr (toSequence e)
     | _ -> "var " + getPat p + " = " + getExpr e
 
 and getExpr =
@@ -109,10 +100,6 @@ and getExpr =
     | ExprMatch (e, rows) -> 
         (["switch"; getExpr e |> surround "(" ")"] |> delim " ")
         + ((rows |> Seq.map (fun m -> "case " + getMatch m + ";") |> delim "") |> surround "{" "}")
-    | ExprMatchLambda (rows) -> 
-        let t = getTmpValId()
-        "function(" + t + ")"
-        + (ExprMatch ((ExprVal (ValId t)), rows) |> toSequence |> getExpr)
     | ExprLambda (args, e) -> "function " + (args |> Seq.map getPat |> delimSurround ", " "(" ")") + getExpr (toSequence e)
     | ExprWithType (t, e) -> getExpr e + " : " + getTyp t
     | ExprModule (ModuleId m, e) -> "class " + m + getExpr e
@@ -156,4 +143,4 @@ let format (str: string) =
     f 0 (str |> Seq.map string |> Seq.toList)
     |> String.concat ""
 
-let getExprAndFormat e = getExpr e |> format
+let getExprAndFormat e = e |> getExpr |> format

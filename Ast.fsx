@@ -59,3 +59,67 @@ module AST =
     and Match = Pat * Expr option * Expr
 
     type Program = Program of Expr
+
+module AstTransform =
+    open AST
+
+    let mutable tmpValId = 0
+    let getTmpValId() = 
+        tmpValId <- tmpValId + 1
+        sprintf "__tmp_%i" tmpValId
+
+    let rec isDefExpr =
+        function
+        | ExprInclude _
+        | ExprBind _ 
+        | ExprRecBind _ 
+        | ExprModule _ 
+        | ExprType _ 
+        | ExprNewType _ -> true
+        | ExprWithType (_,e) -> isDefExpr e
+        | _ -> false
+
+    let rec transformExpr f e =
+        let replacement = f e
+        let g e =
+            match f e with
+            | Some e2 -> transformExpr f e2
+            | None -> transformExpr f e
+        match e with
+        | ExprApp(e1, e2) -> ExprApp(g e1, g e2)
+        | ExprConst c -> ExprConst c
+        | ExprInclude m -> ExprInclude m
+        | ExprInfixApp(e1, v, e2) -> ExprInfixApp(g e1, v, g e2)
+        | ExprTuple es -> es |> List.map g |> ExprTuple
+        | ExprList es -> es |> List.map g |> ExprList
+        | ExprRecord (me, fields) -> ((Option.map g me), (fields |> List.map (fun (f, e) -> f, g e))) |> ExprRecord
+        | ExprSequence es -> es |> List.map g |> ExprSequence
+        | ExprBind (p, e) -> (p, g e) |> ExprBind
+        | ExprRecBind xs ->  xs |> List.map (fun (p, e) -> p, g e) |> ExprRecBind
+        | ExprMatch (e, m) -> (g e, m) |> ExprMatch
+        | ExprMatchLambda m -> ExprMatchLambda m
+        | ExprLambda (p, e) -> ExprLambda (p, g e)
+        | ExprWithType (t, e) -> ExprWithType (t, g e)
+        | ExprModule (m, e) -> ExprModule (m, g e)
+        | ExprType (t, d) -> ExprType (t, d)
+        | ExprNewType (t, d) -> ExprNewType (t, d)
+        | ExprVal v -> ExprVal v
+        
+    let expandMatchLambda =    
+        function
+        | ExprMatchLambda m -> 
+            Some(
+                let tmp = getTmpValId()
+                ExprLambda ([PatBind (ValId tmp)], ExprMatch (ExprVal (ValId tmp), m)))
+        | _ -> None
+        |> transformExpr
+
+    let topLevelExprToMainFunction =
+        function
+        | ExprModule (m, ExprSequence(es)) ->
+            let (defExpr, nonDefExpr) = es |> List.partition isDefExpr
+            let mainFn = ExprBind (PatCons ((ValId "main"), [(PatConst (ConstId "()"))]), ExprSequence nonDefExpr)
+            ExprModule (m, ExprSequence(defExpr @ [mainFn]))
+            |> Some
+        | _ -> None
+        |> transformExpr
