@@ -63,6 +63,7 @@ let compile transformF exprF rewrite ext =
         System.IO.File.WriteAllText(outputPath+".mlastt", sprintf "%A" ast2)
         let out = ast2 |> exprF |> rewrite 
         out |> printfn "%s"
+        ast |> MLASK.AstAnalyse.createBindsDict |> printfn "%A"
         System.IO.File.WriteAllText(outputPath+"."+ext, out))
 
 #if INTERACTIVE

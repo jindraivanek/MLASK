@@ -123,3 +123,15 @@ module AstTransform =
             |> Some
         | _ -> None
         |> transformExpr
+
+module AstAnalyse =
+    open AST
+    let createBindsDict e =
+        let rec f prefix e =
+            match e with
+            | ExprSequence es -> es |> List.collect (f prefix)
+            | ExprModule (ModuleId mId, e) -> f (prefix + mId + ".") e
+            | ExprBind (PatBind (ValId v), e) -> [ValId v, []]
+            | ExprBind (PatCons ((ValId v), pats), e) -> [ValId v, pats]
+            | _ -> []
+        f "" e |> Map.ofList
