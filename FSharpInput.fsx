@@ -80,7 +80,7 @@ let toAST(file) =
                         data, pat, retInfo, init, m, sp)) = binding
             (visitPattern pat, visitExpression init))
         |> Seq.toList 
-        |> (fun x -> if isRec then ExprRecBind x else let (p,e) = Seq.head x in ExprBind (p, e))
+        |> (fun x -> if isRec then ExprRecBind x else let (p,e) = Seq.head x in ExprBind ([], p, e))
 
     and getMatches matches =
         matches |> List.map (function

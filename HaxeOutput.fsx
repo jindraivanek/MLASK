@@ -34,7 +34,7 @@ let rec getTyp =
     function
     | TypType (TypeId x) -> x
     | TypGeneric (GenericId x) -> x
-    | TypWithGeneric(GenericId g, x) -> [g; getTyp x] |> delim " "
+    | TypWithGeneric(gs, x) -> (gs @ [x]) |> List.map getTyp |> delim " "
     | TypFun(t1, t2) -> [t1; t2] |> Seq.map getTyp |> delim " -> "
     | TypTuple(ts) -> ts |> Seq.map getTyp |> delim ", " |> surround "Tuple<" ">"
 
@@ -57,7 +57,7 @@ let rec getDecl =
     | TypeDeclUnion rows -> rows |> Seq.map (fun (ValId v, t) -> v + (t |> Option.map (fun x -> getDecl x |> surround "(" ")") |> Option.fill "")) |> delimSurround " ; " "{" "}"
     | TypeDeclTuple ts -> ts |> Seq.map getDecl |> delim ", " |> surround "Tuple(" ")"
     | TypeDeclId (TypeId p) -> p
-    | TypeDeclWithGeneric (GenericId g, t) -> [g; getDecl t] |> delim " "
+    //| TypeDeclWithGeneric (GenericId g, t) -> [g; getDecl t] |> delim " "
 
 let rec flattenExprList f xs =
     xs |> List.collect (fun x -> match f x with | Some xs2 -> flattenExprList f xs2 | None -> [x])
@@ -92,7 +92,7 @@ and getExpr =
         let fields = rows |> Seq.map (fun (FieldId f, e) -> f + " = " + getExpr e) |> delim "; " 
         let copyStat = copyE |> Option.map (fun x -> getExpr x + " with ") |> Option.fill ""
         copyStat + fields |> surround "{" "}"
-    | ExprBind (p,e) -> 
+    | ExprBind (_,p,e) -> 
         getBind false false (p,e)
     | ExprRecBind bindings -> 
         let n = Seq.length bindings
@@ -110,9 +110,9 @@ and getExpr =
             | TypeDeclUnion rows -> "enum " + tId
             | TypeDeclTuple ts -> ts |> Seq.map getDecl |> delim ", " |> surround "Tuple<" ">"
             | TypeDeclId (TypeId p) -> p
-            | TypeDeclWithGeneric (GenericId g, t) -> getDecl t + (g |> surround "<" ">")
+            //| TypeDeclWithGeneric (GenericId g, t) -> getDecl t + (g |> surround "<" ">")
         prefix + getDecl t
-    | ExprNewType (TypeId tId, t) -> failwith "not supported"
+    //| ExprNewType (TypeId tId, t) -> failwith "not supported"
     | ExprInclude (ModuleId m) -> "load " + m
     | ExprSequence [] -> ""
     | ExprSequence ((ExprModule _ as m) :: es) -> getExpr m + getExpr (ExprSequence es)

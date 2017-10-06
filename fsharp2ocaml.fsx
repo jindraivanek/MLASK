@@ -63,7 +63,7 @@ let compile transformF exprF rewrite ext =
         System.IO.File.WriteAllText(outputPath+".mlastt", sprintf "%A" ast2)
         let out = ast2 |> exprF |> rewrite 
         out |> printfn "%s"
-        ast |> MLASK.AstAnalyse.createBindsDict |> printfn "%A"
+        ast |> MLASK.AST.AstAnalyse.createBindsDict |> printfn "%A"
         System.IO.File.WriteAllText(outputPath+"."+ext, out))
 
 #if INTERACTIVE
@@ -73,7 +73,7 @@ let run() =
 try
     //compile OcamlOutput.getExpr rewriteOcaml "ml"
     let transforms = 
-        MLASK.AstTransform.expandMatchLambda
-        >> MLASK.AstTransform.topLevelExprToMainFunction
+        MLASK.AST.AstTransform.expandMatchLambda
+        >> MLASK.AST.AstTransform.topLevelExprToMainFunction
     compile transforms HaxeOutput.getExprAndFormat rewriteHaxe "hx"
 with e -> printfn "%s::%s" e.Message e.StackTrace
