@@ -1,7 +1,7 @@
-framework: net45
+framework: auto-detect
+storage: none
 source https://www.nuget.org/api/v2
 
 nuget FSharp.Core
 nuget ExtCore
 nuget FSharp.Compiler.Service
-nuget System.Runtime

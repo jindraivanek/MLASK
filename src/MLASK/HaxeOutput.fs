@@ -1,4 +1,4 @@
-#load "IncludeMLASK.fsx"
+module MLASK.Outputs.Haxe
 
 open MLASK.AST
 

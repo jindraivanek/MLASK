@@ -1,6 +1,6 @@
 module MLASK.AST
 
-#load "IncludeMLASK.fsx"
+open ExtCore
 
 type NamespaceId = NamespaceId of string
 type ModuleId = ModuleId of string

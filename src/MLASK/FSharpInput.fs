@@ -1,4 +1,4 @@
-#load "IncludeMLASK.fsx"
+module MLASK.Inputs.FSharp
 
 open System
 open Microsoft.FSharp.Compiler.SourceCodeServices
@@ -12,7 +12,7 @@ let checker = FSharpChecker.Create()
 
 let getUntypedTree (file, input) = 
   // Get compiler options for the 'project' implied by a single script file
-  let projOptions = 
+  let (projOptions, _) = 
       checker.GetProjectOptionsFromScript(file, input)
       |> Async.RunSynchronously
 

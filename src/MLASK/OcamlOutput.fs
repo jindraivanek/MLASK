@@ -1,4 +1,4 @@
-#load "IncludeMLASK.fsx"
+module MLASK.Outputs.OCaml
 
 open MLASK.AST
 
@@ -19,7 +19,7 @@ let rec getTyp =
     function
     | TypType (TypeId x) -> x
     | TypGeneric (GenericId x) -> x
-    | TypWithGeneric(GenericId g, x) -> [g; getTyp x] |> delim " "
+    | TypWithGeneric(gs, x) -> (gs @ [x]) |> List.map getTyp |> delim " "
     | TypFun(t1, t2) -> [t1; t2] |> Seq.map getTyp |> delim " -> "
     | TypTuple(ts) -> ts |> Seq.map getTyp |> delim " * " |> surround "(" ")"
 
@@ -42,7 +42,7 @@ let rec getDecl =
     | TypeDeclUnion rows -> rows |> Seq.map (fun (ValId v, t) -> v + (t |> Option.map (fun x -> " of " + getDecl x) |> Option.fill "")) |> delim " | "
     | TypeDeclTuple ts -> ts |> Seq.map getDecl |> delim " * " |> surround "(" ")"
     | TypeDeclId (TypeId p) -> p
-    | TypeDeclWithGeneric (GenericId g, t) -> [g; getDecl t] |> delim " "
+    //| TypeDeclWithGeneric (GenericId g, t) -> [g; getDecl t] |> delim " "
 
 let rec getMatch (p, whenE, e) =
     let whenClause = whenE |> Option.map (fun x -> " when " + getExpr x) |> Option.fill ""
@@ -67,7 +67,7 @@ and getExpr =
         let fields = rows |> Seq.map (fun (FieldId f, e) -> f + " = " + getExpr e) |> delim "; " 
         let copyStat = copyE |> Option.map (fun x -> getExpr x + " with ") |> Option.fill ""
         copyStat + fields |> surround "{" "}"
-    | ExprBind (p,e) -> 
+    | ExprBind (_,p,e) -> 
         getBind false false (p,e)
     | ExprRecBind bindings -> 
         let n = Seq.length bindings
@@ -82,7 +82,7 @@ and getExpr =
     | ExprWithType (t, e) -> getExpr e + " : " + getTyp t
     | ExprModule (ModuleId m, e) -> "module " + m + " = struct " + nl + getExpr e + " end"
     | ExprType (TypeId tId, t) -> "type " + tId + " = " + getDecl t
-    | ExprNewType (TypeId tId, t) -> "datatype " + tId + " = " + getDecl t
+    //| ExprNewType (TypeId tId, t) -> "datatype " + tId + " = " + getDecl t
     | ExprInclude (ModuleId m) -> "load " + m
     | ExprSequence es -> 
         let n = Seq.length es
