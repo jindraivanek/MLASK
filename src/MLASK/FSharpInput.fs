@@ -41,7 +41,7 @@ let toAST(file) =
 
     let visitLongIdent (ident: LongIdent) =
         let names = String.concat "." [ for i in ident -> i.idText ]
-        sprintf "%s" names
+        names
 
     let visitConst = function
         | SynConst.String(lit,_) -> sprintf "\"%s\"" lit |> ConstId
@@ -63,6 +63,9 @@ let toAST(file) =
     | SynPat.Wild(_) -> PatWildcard
     | SynPat.Named(SynPat.Wild(_), name, _, _, _) -> PatBind(ValId name.idText)
     | SynPat.Named(pat, name, _, _, _) -> PatBindAs(ValId name.idText, visitPattern pat)
+    | SynPat.LongIdent(LongIdentWithDots(ident, _), _, _, SynConstructorArgs.Pats [SynPat.Tuple([x;y],_)], _, _) 
+        when String.startsWith "op_" (visitLongIdent ident) ->
+            PatInfixCons(visitPattern x, ValId (visitLongIdent ident), visitPattern y)
     | SynPat.LongIdent(LongIdentWithDots(ident, _), _, _, pats, _, _) ->
         PatCons(ValId (visitLongIdent ident), visitConstrArgs pats)
     | SynPat.Paren(expr,_) -> visitPattern expr
@@ -112,6 +115,7 @@ let toAST(file) =
     | SynExpr.App(_,false, SynExpr.App(_,true, SynExpr.Ident ident,x,_),y,_) -> 
         ExprInfixApp(visitExpression x, ValId ident.idText, visitExpression y)
     | SynExpr.App(_,false,x,y,_) -> ExprApp(visitExpression x, visitExpression y)
+    | SynExpr.App(_,true,SynExpr.Ident ident,SynExpr.Tuple([x;y], _, _),_) -> ExprInfixApp(visitExpression x, ValId ident.idText, visitExpression y)
     | SynExpr.Ident(ident) -> ExprVal (ValId ident.idText)
     | SynExpr.LongIdent(_, LongIdentWithDots(ident, _), _, _) ->
         ExprVal (ValId (visitLongIdent ident))
