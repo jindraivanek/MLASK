@@ -12,6 +12,22 @@ let samples = [
     "record_bench"
 ]
 
+let rewriteValsOcaml ast =
+    [
+        "op_Addition", "+"
+        "op_Equality", "="
+        "op_Inequality", "<>"
+        "op_LessThan", "<"
+        "op_Subtraction", "-"
+        "op_ColonColon", "::"
+        "op_PipeRight", "|>"
+
+        "printfn", "(Printf.ksprintf print_endline)"
+        "printf", "Printf.printf"
+        "List.head", "List.hd"
+        "List.tail", "List.tl"
+    ] |> Seq.fold (fun ast (x,y) -> AstTransform.replaceVal x y ast) ast
+
 let rewriteOcaml str = 
     str
     |> String.replace "op_Addition" "+"
@@ -22,7 +38,8 @@ let rewriteOcaml str =
     |> String.replace "op_ColonColon" "::"
     |> String.replace "op_PipeRight" "|>"
 
-    |> String.replace "printf" "Printf.printf"
+    |> String.replace "printfn " "(Printf.ksprintf print_endline) "
+    |> String.replace "printf " "Printf.printf "
     |> String.replace "List.head" "List.hd"
     |> String.replace "List.tail" "List.tl"
 
@@ -50,12 +67,17 @@ let rewriteHaxe str =
 
 let firstCharUpperCase s = s |> String.mapi (fun i c -> if i = 0 then System.Char.ToUpper c else c)
 
-let compile transformF exprF rewrite ext =
+let compile transformF exprF rewrite ext inputs =
     System.IO.Directory.CreateDirectory outputDir
-    samples |> Seq.iter (fun x ->
-        let fsFile = samplesDir @@ x + ".fsx" 
+    let inputs = if List.isEmpty inputs then samples else inputs
+    let withoutExt f =
+        let n = System.IO.FileInfo(f).Extension.Length
+        f.Substring(0, f.Length - n)
+    inputs |> Seq.iter (fun fsFile ->
+        let x = withoutExt fsFile
+        printfn "%s" x
         let x = firstCharUpperCase x
-        let outputPath = outputDir @@ x
+        let outputPath = outputDir @@ System.IO.FileInfo(x).Name
         System.IO.File.WriteAllText(outputPath+".fsast", sprintf "%A" (MLASK.Inputs.FSharp.getFsAst fsFile))
         let ast = fsFile |> MLASK.Inputs.FSharp.toAST
         System.IO.File.WriteAllText(outputPath+".mlast", sprintf "%A" ast)
@@ -66,9 +88,9 @@ let compile transformF exprF rewrite ext =
         ast |> MLASK.AST.AstAnalyse.createBindsDict |> printfn "%A"
         System.IO.File.WriteAllText(outputPath+"."+ext, out))
 
-let run() =
+let run inputs =
     try
-        compile id MLASK.Outputs.OCaml.getExpr rewriteOcaml "ml"
+        compile rewriteValsOcaml MLASK.Outputs.OCaml.getExpr id "ml" inputs
         // let transforms = 
         //     MLASK.AST.AstTransform.expandMatchLambda
         //     >> MLASK.AST.AstTransform.topLevelExprToMainFunction
@@ -77,5 +99,5 @@ let run() =
 
 [<EntryPoint>]
 let main argv =
-    run()
+    run (Seq.toList argv)
     0 // return an integer exit code

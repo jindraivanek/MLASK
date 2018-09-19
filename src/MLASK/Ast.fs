@@ -324,6 +324,24 @@ module AstTransform =
         | _ -> None
         |> Transforms.exprMap
 
+    let replaceVal oldValId newValId =
+        let exprF =
+            function
+            | ExprVal (ValId x) when x = oldValId -> ExprVal (ValId newValId) |> Some
+            | ExprInfixApp (e1, ValId x, e2) when x = oldValId -> ExprInfixApp (e1, ValId newValId, e2) |> Some
+            | _ -> None
+        let patF =
+            function
+            | PatBind (ValId x) when x = oldValId -> PatBind (ValId newValId) |> Some
+            | PatCons (ValId x, ps) when x = oldValId -> PatCons (ValId newValId, ps) |> Some
+            | PatInfixCons (p1, ValId x, p2) when x = oldValId -> PatInfixCons (p1, ValId newValId, p2) |> Some
+            | PatBindAs (ValId x, p) when x = oldValId -> PatBindAs (ValId newValId, p) |> Some
+            | _ -> None
+        { ASTmapF.Default with
+            ExprF = exprF
+            PatF = patF
+        } |> Transforms.transformExpr
+
 module AstAnalyse =
     let createBindsDict e =
         let rec f prefix e =

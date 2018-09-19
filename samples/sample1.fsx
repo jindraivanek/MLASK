@@ -8,5 +8,4 @@ let foo() =
     else
       printfn "baf"
       printfn "%s" msg
-let main() =
-  foo()
+foo()
