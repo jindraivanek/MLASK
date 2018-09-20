@@ -17,12 +17,17 @@ let getUntypedTree (file, input) =
       |> Async.RunSynchronously
 
   // Run the first phase (untyped parsing) of the compiler
-  let parseFileResults = 
-      checker.ParseFileInProject(file, input, projOptions) 
+  let parseFileResults, checkFileAnswer = 
+      checker.ParseAndCheckFileInProject(file, 0, input, projOptions) 
       |> Async.RunSynchronously
+  
+  let checkFileResults = 
+    match checkFileAnswer with
+    | FSharpCheckFileAnswer.Succeeded(res) -> res
+    | res -> failwithf "Parsing did not finish... (%A)" res
 
   match parseFileResults.ParseTree with
-  | Some tree -> tree
+  | Some tree -> tree, checkFileResults
   | None -> failwith "Something went wrong during parsing!"
 
 let getFsAst file =
@@ -37,7 +42,7 @@ let toAST(file) =
         | [x] -> x
         | [] -> f []
 
-    let tree = getFsAst file
+    let (tree, checkResult) = getFsAst file
 
     let visitLongIdent (ident: LongIdent) =
         let names = String.concat "." [ for i in ident -> i.idText ]
@@ -115,7 +120,10 @@ let toAST(file) =
     | SynExpr.App(_,false, SynExpr.App(_,true, SynExpr.Ident ident,x,_),y,_) -> 
         ExprInfixApp(visitExpression x, ValId ident.idText, visitExpression y)
     | SynExpr.App(_,false,x,y,_) -> ExprApp(visitExpression x, visitExpression y)
-    | SynExpr.App(_,true,SynExpr.Ident ident,SynExpr.Tuple([x;y], _, _),_) -> ExprInfixApp(visitExpression x, ValId ident.idText, visitExpression y)
+    | SynExpr.App(_,true,SynExpr.Ident ident,SynExpr.Tuple([x;y], _, _),_) -> 
+        let u = checkResult.GetSymbolUseAtLocation(ident.idRange.EndLine, ident.idRange.EndColumn, ident.idText, [])
+        printfn "%A" u
+        ExprInfixApp(visitExpression x, ValId ident.idText, visitExpression y)
     | SynExpr.Ident(ident) -> ExprVal (ValId ident.idText)
     | SynExpr.LongIdent(_, LongIdentWithDots(ident, _), _, _) ->
         ExprVal (ValId (visitLongIdent ident))
